@@ -680,6 +680,10 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/success_result_output.json"
         else:
             file_path = os.path.join(file_path, f"{task_id}/success_result_output.json")
+        
+        # 创建目录（如果不存在）
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
         with open(file_path, "w") as file:
             if result.trace is None or len(result.trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
@@ -707,7 +711,6 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 images.append(state.img_path)
 
             json.dump(output, file, indent=4)
-
     
     @staticmethod
     def print_result(result: MCTSResult):
@@ -795,6 +798,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
 
         # 将useless_fail_trace存储到当前目录下的新建JSON文件中，每行一条轨迹
         useless_fail_trace_file = "useless_fail_trace.jsonl"
+        os.makedirs(os.path.dirname(useless_fail_trace_file), exist_ok=True)
         with open(useless_fail_trace_file, "w", encoding="utf-8") as f:
             for trace in useless_fail_trace:
                 json.dump(trace, f, ensure_ascii=False)
@@ -809,6 +813,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/fail_result_output.json"
         else:
             file_path = os.path.join(file_path, f"{task_id}/fail_result_output.json")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w") as file:
             if result.fail_trace is None or len(result.fail_trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
