@@ -331,6 +331,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         if flag:
             actions = await self.search_config.get_actions(node.state)
         else:
+            while node.parent.state is None:
+                node = node.parent
             actions = await self.search_config.get_actions(node.parent.state)
         print("Got possible actions")
         if not actions:
