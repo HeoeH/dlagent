@@ -4,6 +4,10 @@ import sys
 from typing import List, Tuple
 import re
 import numpy as np
+import argparse
+import os
+import json
+import asyncio
 from langsmith import traceable
 from playwright.async_api import Page
 from agentq.core.prompts.prompts import LLM_PROMPTS
@@ -956,7 +960,7 @@ async def wait_for_navigation(max_retries=3):
     print(f"{RED}[DEBUG] Navigation failed after {max_retries} attempts{RESET}")
 
 
-async def main(objective: str = None, eval_mode: bool = False, task_id: str = None):
+async def main(objective: str = None, eval_mode: bool = False, task_id: str = None,fail_path:str=None,success_path:str=None):
     print(f"{BLUE}Starting MCTS{RESET}")
     playwright_manager = PlaywrightManager()
 
@@ -996,9 +1000,9 @@ async def main(objective: str = None, eval_mode: bool = False, task_id: str = No
     # Print results
     print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
 
-    BrowserMCTSWrapper.print_max_result(result,task_id)
+    BrowserMCTSWrapper.print_max_result(result,task_id,success_path)
     BrowserMCTSWrapper.filter_fail_result(result,filter)
-    BrowserMCTSWrapper.print_fail_result(result,task_id)
+    BrowserMCTSWrapper.print_fail_result(result,task_id,fail_path)
             
 
     # # Tree visualization
@@ -1030,12 +1034,23 @@ class StreamToFile:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run MCTS with specified directory and log file.")
+    parser.add_argument("--directory", type=str, required=True, help="The directory containing JSONL files.")
+    parser.add_argument("--log_file", type=str, required=True, help="The log file to write completed tasks.")
+    parser.add_argument("--fail_path", type=str, help="The file path to write the fail result output.")
+    parser.add_argument("--success_path", type=str, help="The file path to write the maxreward result output.")
+    args = parser.parse_args()
+
+    directory = args.directory
+    log_file = args.log_file
+    fail_path = args.fail_path
+    success_path = args.success_path
+
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     completed_tasks = []
 
     try:
-        # 遍历 /data_webvoyager_training/IL 目录下的所有 .jsonl 文件
-        directory = "data_webvoyager_training/optim_iter3"
+        # 遍历指定目录下的所有 .jsonl 文件
         jsonl_files = [f for f in os.listdir(directory) if f.endswith('.jsonl')]
         print(f"{CYAN}[DEBUG] Found JSONL files: {jsonl_files}{RESET}")
 
@@ -1054,18 +1069,19 @@ if __name__ == "__main__":
                 print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
                 print(f"{CYAN}[DEBUG] task_id: {task_id}{RESET}")
 
-
                 asyncio.run(
                     main(
                         objective=objective,
                         eval_mode=False,
                         task_id=task_id,
+                        fail_path=fail_path,
+                        success_path=success_path,
                     )
                 )
                 completed_tasks.append(task_id)
 
     finally:
-        with open("completed_tasks_optim3.log", "w") as f:
+        with open(log_file, "w") as f:
             for task_id in completed_tasks:
                 f.write(f"{task_id}\n")
 
