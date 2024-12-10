@@ -133,7 +133,7 @@ async def get_screenshot(
         # Save the screenshot to a file
         timestamp = get_formatted_timestamp()
         # 确定 result 文件夹的路径
-        base_folder = Path(f"/dataset/wangzh/omni_dc/dlagent_result/optim2/{task_id}").resolve()
+        base_folder = Path(f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}").resolve()
         base_folder.mkdir(parents=True, exist_ok=True)  # 确保 result 文件夹存在
         
         # 构造截图文件路径

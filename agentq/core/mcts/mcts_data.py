@@ -673,7 +673,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     @staticmethod
     def print_max_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
-            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim2/{task_id}/success_result_output.json"
+            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/success_result_output.json"
         with open(file_path, "w") as file:
             if result.trace is None or len(result.trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
@@ -799,7 +799,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     @staticmethod
     def print_fail_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
-            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim2/{task_id}/fail_result_output.json"
+            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/fail_result_output.json"
         with open(file_path, "w") as file:
             if result.fail_trace is None or len(result.fail_trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
@@ -1035,7 +1035,7 @@ if __name__ == "__main__":
 
     try:
         # 遍历 /data_webvoyager_training/IL 目录下的所有 .jsonl 文件
-        directory = "data_webvoyager_training/optim_iter2"
+        directory = "data_webvoyager_training/optim_iter3"
         jsonl_files = [f for f in os.listdir(directory) if f.endswith('.jsonl')]
         print(f"{CYAN}[DEBUG] Found JSONL files: {jsonl_files}{RESET}")
 
@@ -1065,7 +1065,7 @@ if __name__ == "__main__":
                 completed_tasks.append(task_id)
 
     finally:
-        with open("completed_tasks_optim2.log", "w") as f:
+        with open("completed_tasks_optim3.log", "w") as f:
             for task_id in completed_tasks:
                 f.write(f"{task_id}\n")
 
