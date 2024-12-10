@@ -335,7 +335,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             while node_tmp.state is None:
                 node_tmp = node.parent
             actions = await self.search_config.get_actions(node_tmp.state)
-            node = MCTSNode(
+            new_node = MCTSNode(
                 state=None,
                 action=node_tmp.action,
                 parent=node_tmp.parent,
@@ -344,6 +344,13 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 is_terminal=node_tmp.is_terminal,
                 calc_q=node_tmp.calc_q,
             )
+            node.state = new_node.state
+            node.action = new_node.action
+            node.parent = new_node.parent
+            node.fast_reward = new_node.fast_reward
+            node.fast_reward_details = new_node.fast_reward_details
+            node.is_terminal = new_node.is_terminal
+            node.calc_q = new_node.calc_q
         print("Got possible actions")
         if not actions:
             node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
