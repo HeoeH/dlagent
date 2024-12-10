@@ -960,7 +960,7 @@ async def wait_for_navigation(max_retries=3):
     print(f"{RED}[DEBUG] Navigation failed after {max_retries} attempts{RESET}")
 
 
-async def main(objective: str = None, eval_mode: bool = False, task_id: str = None,fail_path:str=None,success_path:str=None):
+async def main(objective: str = None, eval_mode: bool = False, task_id: str = None,fail_path:str=None,success_path:str=None,n_iteration:int=None):
     print(f"{BLUE}Starting MCTS{RESET}")
     playwright_manager = PlaywrightManager()
 
@@ -988,7 +988,7 @@ async def main(objective: str = None, eval_mode: bool = False, task_id: str = No
         critic=critic,
         vision=vision,
         filter=filter,
-        n_iterations=8,
+        n_iterations=n_iteration,
         depth_limit=15,
         exploration_weight=1.0,
         task_id=task_id,
@@ -1039,12 +1039,14 @@ if __name__ == "__main__":
     parser.add_argument("--log_file", type=str, required=True, help="The log file to write completed tasks.")
     parser.add_argument("--fail_path", type=str, help="The file path to write the fail result output.")
     parser.add_argument("--success_path", type=str, help="The file path to write the maxreward result output.")
+    parser.add_argument("--n_iteration", type=int, help="n_iteration")
     args = parser.parse_args()
 
     directory = args.directory
     log_file = args.log_file
     fail_path = args.fail_path
     success_path = args.success_path
+    n_iteration=args.n_iteration
 
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     completed_tasks = []
@@ -1076,6 +1078,7 @@ if __name__ == "__main__":
                         task_id=task_id,
                         fail_path=fail_path,
                         success_path=success_path,
+                        n_iteration=n_iteration
                     )
                 )
                 completed_tasks.append(task_id)
