@@ -678,6 +678,8 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     def print_max_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
             file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/success_result_output.json"
+        else:
+            file_path = os.path.join(file_path, f"{task_id}/success_result_output.json")
         with open(file_path, "w") as file:
             if result.trace is None or len(result.trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
@@ -804,6 +806,8 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     def print_fail_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
             file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/fail_result_output.json"
+        else:
+            file_path = os.path.join(file_path, f"{task_id}/fail_result_output.json")
         with open(file_path, "w") as file:
             if result.fail_trace is None or len(result.fail_trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
