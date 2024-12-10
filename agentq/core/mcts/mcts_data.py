@@ -206,7 +206,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
                         text=action.content,
                     )
                     async def type_action():
-                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=60000)
+                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=10000)
                         await entertext(entry)
                     if await retry_action(type_action):
                         print(f"{CYAN}[DEBUG] Typed text into element{RESET}")
@@ -214,7 +214,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
                         raise Exception("Failed to type text")
                 elif action.type == ActionType.CLICK:
                     async def click_action():
-                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=60000)
+                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=10000)
                         await click(
                             selector=f"[mmid='{action.mmid}']",
                             wait_before_execution=action.wait_before_execution or 2,
@@ -239,7 +239,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
                         raise Exception("Failed to enter text and click element")
                 elif action.type == ActionType.HOVER:
                     async def hover_action():
-                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=60000)
+                        await page.wait_for_selector(f"[mmid='{action.mmid}']", state='visible', timeout=10000)
                         await page.hover(selector=f"[mmid='{action.mmid}']")
                     if await retry_action(hover_action):
                         print(f"{CYAN}[DEBUG] Hovered over element{RESET}")
