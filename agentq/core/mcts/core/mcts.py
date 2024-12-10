@@ -316,7 +316,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             # information can be cached and passed from the world model
             # to the reward function with **aux without repetitive computation
                 node.reward, node.fast_reward_details, node.is_terminal = await self.search_config.reward(
-                    node.state, node.action, **node.fast_reward_details, **aux
+                    node.state, node.action, **node.fast_reward_details
                 )
             # node.is_terminal = await self.world_model.is_terminal(node.state)
             except Exception as e:
@@ -335,7 +335,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         print("Got possible actions")
         if not actions:
             node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
-                node.state, node.action, **node.fast_reward_details, **aux
+                node.state, node.action, **node.fast_reward_details
             )
             return flag, False
 

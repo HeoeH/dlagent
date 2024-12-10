@@ -160,7 +160,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
             print(f"{GREEN}[DEBUG] New state after step - URL: {new_url}{RESET}")
             return new_state, {}
         except Exception as e:
-            raise Exception("Error: Unable to execute action")
+            raise Exception(f"Error: Unable to execute action:{e}")
 
     async def is_terminal(self, state: BrowserState) -> bool:
         print(f"completed_task_world:{state.completed_tasks}")
@@ -428,7 +428,7 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
         return ranked_actions
 
     async def reward(
-        self, state: BrowserState, action: BrowserAction, **kwargs
+        self, state: BrowserState, action: BrowserAction
     ) -> Tuple[float, dict, bool]:
         print(f"completed_task_reward:{state.completed_tasks}")
         terminal_state = await is_terminal(
@@ -684,6 +684,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             if result.trace is None or len(result.trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
                 return
+            print(f"{GREEN}[DEBUG] success_file:{file_path}")
             states, actions = result.trace
             conversations = []
             images = []
@@ -812,6 +813,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             if result.fail_trace is None or len(result.fail_trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
                 return
+            print(f"{GREEN}[DEBUG] fail_file:{file_path}")
             output = []
             system_prompt: str = LLM_PROMPTS["AGENTQ_FINETUNE_PROMPT"]
             for j, trace in enumerate(result.fail_trace):
