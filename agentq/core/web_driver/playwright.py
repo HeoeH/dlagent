@@ -16,7 +16,7 @@ from agentq.utils.ui_messagetype import MessageType
 
 
 class PlaywrightManager:
-    _homepage = "https://www.apple.com"
+    _homepage = "https://www.google.com"
     _playwright = None
     _browser_context = None
     __async_initialize_done = False
@@ -64,7 +64,7 @@ class PlaywrightManager:
         self.set_screenshots_dir(screenshots_dir)
 
     async def async_initialize(
-        self, eval_mode: bool = False, homepage: str = "https://google.com/"
+        self, eval_mode: bool = True, homepage: str = "https://google.com/"
     ):
         """
         Asynchronously initialize necessary components and handlers for the browser context.
@@ -201,13 +201,20 @@ class PlaywrightManager:
                     f"Starting a temporary browser instance. trying to launch with a new user dir {new_user_dir}"
                 )
                 PlaywrightManager._browser_context = await PlaywrightManager._playwright.chromium.launch_persistent_context(
-                    new_user_dir,
+                    user_data_dir=new_user_dir,
+                    executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe', 
                     channel="chrome",
                     headless=self.isheadless,
+                    slow_mo=10,
+                    bypass_csp=True, 
+                    accept_downloads=True,
                     args=[
                         "--disable-blink-features=AutomationControlled",
                         "--disable-session-crashed-bubble",  # disable the restore session bubble
-                        "--disable-infobars",  # disable informational popups,
+                        "--disable-infobars", 
+                        '--remote-debugging-port=9222', # 启用远程调试端口
+                        '--in-process-plugins', #插件在浏览器进程中运行
+                        '--allow-outdated-plugins', # 允许使用过渡插件
                     ],
                     no_viewport=True,
                 )

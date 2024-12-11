@@ -678,38 +678,40 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     @staticmethod
     def print_max_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
-            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/success_result_output.json"
+            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/fail_result_output.json"
         else:
             file_path = os.path.join(file_path, f"{task_id}/success_result_output.json")
-        
-        # 创建目录（如果不存在）
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
         with open(file_path, "w") as file:
             if result.trace is None or len(result.trace) == 0:
                 json.dump({"debug": "No valid path found"}, file, indent=4)
                 return
             print(f"{GREEN}[DEBUG] success_file:{file_path}")
-            states, actions = result.trace
-            conversations = []
-            images = []
+            output = []
             system_prompt: str = LLM_PROMPTS["AGENTQ_FINETUNE_PROMPT"]
-            output = {
-                "id": task_id,
-                "conversations": [{"from": "system", "value": system_prompt}],
-                "images": images
-            }
-            for i, (state, action) in enumerate(zip(states, actions)):
-                input_data = AgentQActorInput(
-                    objective=state.objective,
-                    completed_tasks=state.completed_tasks,
-                    current_web_text=state.web_text,
-                    current_base64_img=state.img_path,
-                )
-                response = action.task_with_action
-                messages = process_data(input_data, response)
-                output["conversations"].extend(messages)
-                images.append(state.img_path)
+            for j, trace in enumerate(result.trace):
+                states, actions = trace
+                conversations = [{"from": "system", "value": system_prompt}]
+                images = []
+                modify_objective=states[-1].done_objective
+                for i, (state, action) in enumerate(zip(states, actions)):
+                    input_data = AgentQActorInput(
+                        objective=modify_objective,
+                        completed_tasks=state.completed_tasks,
+                        current_web_text=state.web_text,
+                        current_base64_img="<image>",
+                    )
+                    response = action.task_with_action
+                    messages = process_data(input_data, response)
+                    conversations.extend(messages)
+                    images.append(state.img_path)
+
+                trace_output = {
+                    "id": f"{task_id}_{j}",
+                    "conversations": conversations,
+                    "images": images
+                }
+                output.append(trace_output)
 
             json.dump(output, file, indent=4)
     
@@ -768,10 +770,10 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
 
 
     @staticmethod
-    async def filter_fail_result(result: MCTSResult, filter: BaseAgent) -> MCTSResult:
+    async def filter_fail_result(result: MCTSResult, filter: BaseAgent) -> Tuple[MCTSResult,MCTSResult]:
         if result.fail_trace is None or len(result.fail_trace) == 0:
             print(f"{RED}[DEBUG] No valid path found{RESET}")
-            return result
+            return result,result
         filtered_fail_trace = []
         useless_fail_trace = []
         for j, trace in enumerate(result.fail_trace):
@@ -805,18 +807,18 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             fail_trace=filtered_fail_trace,
             # 其他属性保持不变
         )
+        useless_result = MCTSResult(
+            terminal_state=result.terminal_state,
+            cum_reward=result.cum_reward,
+            trace_of_nodes=result.trace_of_nodes,
+            tree_state=result.tree_state,
+            trace=result.trace,
+            fail_trace=useless_fail_trace,
+            # 其他属性保持不变
+        )
 
-        # 将useless_fail_trace存储到当前目录下的新建JSON文件中，每行一条轨迹
-        useless_fail_trace_file = "useless_fail_trace.jsonl"
-        if os.path.dirname(useless_fail_trace_file):
-            os.makedirs(os.path.dirname(useless_fail_trace_file), exist_ok=True)
-        with open(useless_fail_trace_file, "w", encoding="utf-8") as f:
-            for trace in useless_fail_trace:
-                json.dump(trace, f, ensure_ascii=False)
-                f.write("\n")
-        print(f"{GREEN}[DEBUG] Useless fail traces saved to {useless_fail_trace_file}{RESET}")
 
-        return new_result
+        return new_result,useless_result
                         
 
     
@@ -832,6 +834,46 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 json.dump({"debug": "No valid path found"}, file, indent=4)
                 return
             print(f"{GREEN}[DEBUG] fail_file:{file_path}")
+            output = []
+            system_prompt: str = LLM_PROMPTS["AGENTQ_FINETUNE_PROMPT"]
+            for j, trace in enumerate(result.fail_trace):
+                states, actions = trace
+                conversations = [{"from": "system", "value": system_prompt}]
+                images = []
+                modify_objective=states[-1].done_objective
+                for i, (state, action) in enumerate(zip(states, actions)):
+                    input_data = AgentQActorInput(
+                        objective=modify_objective,
+                        completed_tasks=state.completed_tasks,
+                        current_web_text=state.web_text,
+                        current_base64_img="<image>",
+                    )
+                    response = action.task_with_action
+                    messages = process_data(input_data, response)
+                    conversations.extend(messages)
+                    images.append(state.img_path)
+
+                trace_output = {
+                    "id": f"fail_{task_id}_{j}",
+                    "conversations": conversations,
+                    "images": images
+                }
+                output.append(trace_output)
+
+            json.dump(output, file, indent=4)
+
+    @staticmethod
+    def print_useless_result(result: MCTSResult, task_id: str, file_path: str = None):
+        if file_path is None:
+            file_path = f"/dataset/wangzh/omni_dc/dlagent_result/optim3/{task_id}/fail_result_output.json"
+        else:
+            file_path = os.path.join(file_path, f"{task_id}/useless_result_output.json")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w") as file:
+            if result.fail_trace is None or len(result.fail_trace) == 0:
+                json.dump({"debug": "No valid path found"}, file, indent=4)
+                return
+            print(f"{GREEN}[DEBUG] useless_file:{file_path}")
             output = []
             system_prompt: str = LLM_PROMPTS["AGENTQ_FINETUNE_PROMPT"]
             for j, trace in enumerate(result.fail_trace):
@@ -1025,8 +1067,9 @@ async def main(objective: str = None, eval_mode: bool = False, task_id: str = No
     print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
 
     BrowserMCTSWrapper.print_max_result(result,task_id,success_path)
-    result_f=await BrowserMCTSWrapper.filter_fail_result(result,filter)
+    result_f,useless_f=await BrowserMCTSWrapper.filter_fail_result(result,filter)
     BrowserMCTSWrapper.print_fail_result(result_f,task_id,fail_path)
+    BrowserMCTSWrapper.print_useless_result(useless_f,task_id,fail_path)
             
 
     # # Tree visualization

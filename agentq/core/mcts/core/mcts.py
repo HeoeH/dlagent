@@ -98,7 +98,7 @@ class MCTSNode(Generic[State, Action, Example]):
 class MCTSResult(NamedTuple):
     terminal_state: State
     cum_reward: float
-    trace: Trace
+    trace: list[Trace]
     trace_of_nodes: list[MCTSNode]
     tree_state: MCTSNode
     trace_in_each_iter: list[list[MCTSNode]] = None
@@ -219,6 +219,10 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self.output_strategy = output_strategy
         self.uct_with_fast_reward = uct_with_fast_reward
         self._output_iter: list[MCTSNode] = None
+        self._next_reward_iter: list[MCTSNode] = None
+        self._follow_reward_iter: list[MCTSNode] = None
+        self._follow_cum_reward = -math.inf
+        self._next_cum_reward = -math.inf
         self._output_cum_reward = -math.inf
         self.trace_in_each_iter: list[list[MCTSNode]] = None
         self.root: Optional[MCTSNode] = None
@@ -447,6 +451,36 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             print(f'node.newQ:{node.Q}')
             print(f'node.newN:{node.N}')
         return path[0].Q  # Return the root node's updated Q-value
+    
+    def _dfs_next_reward(self, path: list[MCTSNode]) -> tuple[float, list[MCTSNode]]:
+        cur = path[-1]
+        if cur.is_terminal:
+            reward = self.cum_reward([node.reward for node in path[1:]])
+            return reward, path
+        if cur.children is None:
+            return -math.inf, path
+        visited_children = [x for x in cur.children if x.state is not None]
+        if len(visited_children) == 0:
+            return -math.inf, path
+            
+        # 收集所有可能的路径和奖励
+        all_paths = []
+        for child in visited_children:
+            reward, child_path = self._dfs_next_reward(path + [child])
+            if reward != -math.inf:  # 只保存有效路径
+                all_paths.append((reward, child_path))
+        
+        # 根据奖励排序
+        sorted_paths = sorted(all_paths, key=lambda x: x[0], reverse=True)
+        
+        # 返回次优路径（如果存在）
+        if len(sorted_paths) >= 2:
+            return sorted_paths[1]  # 返回第二高奖励的路径
+        elif len(sorted_paths) == 1:
+            return -math.inf, path  # 如果只有一条路径，返回该路径
+        else:
+            return -math.inf, path  # 如果没有有效路径，返回默认值
+
 
     def _dfs_max_reward(self, path: list[MCTSNode]) -> tuple[float, list[MCTSNode]]:
         cur = path[-1]
@@ -487,20 +521,25 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                     self.trace_in_each_iter.append(deepcopy(path))
 
 
-        if self.output_strategy == "follow_max":
-            self._output_iter = []
+        # if self.output_strategy == "follow_max":
+        if self.output_strategy == "max_reward":
+            self._follow_reward_iter = []
             cur = self.root
             while True:
-                self._output_iter.append(cur)
+                self._follow_reward_iter.append(cur)
                 if cur.is_terminal:
                     break
                 visited_children = [x for x in cur.children if x.state is not None]
                 if len(visited_children) == 0:
                     break
                 cur = max(visited_children, key=lambda x: x.reward)
-            self._output_cum_reward = self.cum_reward(
-                [node.reward for node in self._output_iter[1::-1]]
+            self._follow_cum_reward = self.cum_reward(
+                [node.reward for node in self._follow_reward_iter[1::-1]]
             )
+            if self._follow_cum_reward == -math.inf:
+                self._follow_reward_iter = None
+            if self._follow_reward_iter is None:
+                print(f"{RED}self._follow_reward_iter is None")
         if self.output_strategy == "max_reward":
             self._output_cum_reward, self._output_iter = self._dfs_max_reward(
                 [self.root]
@@ -509,6 +548,14 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 self._output_iter = None
             if self._output_iter is None:
                 print(f"{RED}self._output_iter is None")
+        if self.output_strategy == "max_reward":
+            self._next_cum_reward, self._next_reward_iter = self._dfs_next_reward(
+                [self.root]
+            )
+            if self._next_cum_reward == -math.inf:
+                self._next_reward_iter = None
+            if self._next_reward_iter is None:
+                print(f"{RED}self._next_reward_iter is None")
 
     async def __call__(
         self,
@@ -522,17 +569,49 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self.search_config = search_config
 
         await self.search()
-
+        trace=[]
         if self._output_iter is None:
-            terminal_state = trace = None
+            terminal_state = trace_max = None
         else:
             terminal_state = self._output_iter[-1].state
-            trace = (
+            trace_max = (
                 [node.state for node in self._output_iter],
                 [node.action for node in self._output_iter[1:]],
             )
-        if trace is None:
-            print(f"{RED}trace is None")
+        if trace_max is None:
+            print(f"{RED}trace_max is None")
+        else:
+            trace.append(trace_max)
+
+
+        if self._next_reward_iter is None:
+            terminal_next_state = trace_next = None
+        else:
+            terminal_next_state = self._next_reward_iter[-1].state
+            trace_next = (
+                [node.state for node in self._next_reward_iter],
+                [node.action for node in self._next_reward_iter[1:]],
+            )
+        if trace_next is None:
+            print(f"{RED}trace_next is None")
+        else:
+            trace.append(trace_next)
+            
+        
+        if self._follow_reward_iter is None:
+            terminal_follow_state = trace_follow = None
+        else:
+            terminal_follow_state = self._follow_reward_iter[-1].state
+            trace_follow = (
+                [node.state for node in self._follow_reward_iter],
+                [node.action for node in self._follow_reward_iter[1:]],
+            )
+        if trace_follow is None:
+            print(f"{RED}trace_follow is None")
+        else:
+            trace.append(trace_follow)
+        
+
         trace_in_each_iter = self.trace_in_each_iter
         fail_trace = []
         if trace_in_each_iter:
