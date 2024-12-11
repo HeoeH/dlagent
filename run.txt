@@ -1,0 +1,4 @@
+python -m agentq.core.mcts.mcts_data --directory data_webvoyager_training/IL --log_file completed_tasks_optim_IL.log  --fail_path result/IL  --success_path result/IL  --n_iteration 1 --depth_limit 5
+
+
+python -m agentq.core.mcts.mcts_data --directory data_webvoyager_training/optim_iter2 --log_file completed_tasks_optim_iter2.log --fail_path result/optim_iter2  --success_path result/optim_iter2  --n_iteration 7 --depth_limit 15
