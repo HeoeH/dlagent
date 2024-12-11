@@ -425,6 +425,7 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             for task in proposed_tasks_with_actions:
                 state.completed_tasks.append(task)
             ranked_actions = []
+            ranked_actions.append(BrowserAction(task_with_action=task, rank=1))
         return ranked_actions
 
     async def reward(
@@ -767,7 +768,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
 
 
     @staticmethod
-    async def filter_fail_result(result: MCTSResult, filter: BaseAgent):
+    def filter_fail_result(result: MCTSResult, filter: BaseAgent):
         if result.fail_trace is None or len(result.fail_trace) == 0:
             print(f"{RED}[DEBUG] No valid path found{RESET}")
             return
@@ -780,10 +781,10 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 fail_input: FailFilterInput = FailFilterInput(
                     objective=last_state.done_objective,
                     completed_tasks=last_state.completed_tasks,
-                    current_base64_img=last_state.current_base64_img,
+                    current_base64_img=last_state.base64_img,
                     done_description=last_state.done_description,
                 )
-                fail_output: FailFilterOutput = await filter.run(fail_input)
+                fail_output: FailFilterOutput =  filter.run(fail_input)
                 repeatability = fail_output.repeatability
                 ineffectiveness = fail_output.ineffectiveness
                 exploratory = fail_output.exploratory

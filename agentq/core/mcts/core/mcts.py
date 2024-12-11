@@ -4,7 +4,7 @@ from abc import ABC
 from collections import defaultdict
 from copy import deepcopy
 from typing import Callable, Generic, Hashable, NamedTuple, Optional
-
+from agentq.core.models.models import STOPAction 
 import numpy as np
 from tqdm import trange
 # ANSI color codes
@@ -276,6 +276,20 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             ):
                 return path
             node = self._uct_select(node)
+            try:
+                await self.world_model.step(node.parent.state, node.action)
+            except Exception as e:
+                print(f"Exception during world_model.step:{e},retry..")
+                try:
+                    await self.world_model.step(node.parent.state, node.action)
+                except  Exception as e:
+                    if not node.children:
+                        node.parent.children.remove(node)
+                        node=self._uct_select(node.parent)
+                    else:
+                        node.N=10
+                        node=self._uct_select(node.parent)
+
            
 
     # def _uct(self, node: MCTSNode) -> float:
@@ -352,10 +366,19 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             node.is_terminal = new_node.is_terminal
             node.calc_q = new_node.calc_q
         print("Got possible actions")
-        if not actions:
+        if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
             node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
                 node.state, node.action, **node.fast_reward_details
             )
+            child = MCTSNode(
+                state=None,
+                action=actions[0],
+                parent=node,
+                fast_reward=node.reward,
+                fast_reward_details={},
+                calc_q=self.calc_q,
+            )
+            node.children = children
             return flag, False
 
         for action in actions:
@@ -385,6 +408,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             if node.state is None:
                 flag,result_child=await self._expand(node) 
                 if flag:
+                    print(f"node.node.action.task_with_action:{node.action.task_with_action}")
                     path.append(node)
                 print(f"result_child:{result_child}")
                 print(f"flag:{flag}")  
