@@ -768,10 +768,10 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
 
 
     @staticmethod
-    def filter_fail_result(result: MCTSResult, filter: BaseAgent):
+    async def filter_fail_result(result: MCTSResult, filter: BaseAgent) -> MCTSResult:
         if result.fail_trace is None or len(result.fail_trace) == 0:
             print(f"{RED}[DEBUG] No valid path found{RESET}")
-            return
+            return result
         filtered_fail_trace = []
         useless_fail_trace = []
         for j, trace in enumerate(result.fail_trace):
@@ -784,7 +784,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                     current_base64_img=last_state.base64_img,
                     done_description=last_state.done_description,
                 )
-                fail_output: FailFilterOutput =  filter.run(fail_input)
+                fail_output: FailFilterOutput = await filter.run(fail_input)
                 repeatability = fail_output.repeatability
                 ineffectiveness = fail_output.ineffectiveness
                 exploratory = fail_output.exploratory
@@ -795,17 +795,29 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 else:
                     useless_fail_trace.append(trace)
 
-        result.fail_trace = filtered_fail_trace
+        # 创建一个新的 MCTSResult 实例，并更新 fail_trace
+        new_result = MCTSResult(
+            terminal_state=result.terminal_state,
+            cum_reward=result.cum_reward,
+            trace_of_nodes=result.trace_of_nodes,
+            tree_state=result.tree_state,
+            trace=result.trace,
+            fail_trace=filtered_fail_trace,
+            # 其他属性保持不变
+        )
 
         # 将useless_fail_trace存储到当前目录下的新建JSON文件中，每行一条轨迹
         useless_fail_trace_file = "useless_fail_trace.jsonl"
-        os.makedirs(os.path.dirname(useless_fail_trace_file), exist_ok=True)
+        if os.path.dirname(useless_fail_trace_file):
+            os.makedirs(os.path.dirname(useless_fail_trace_file), exist_ok=True)
         with open(useless_fail_trace_file, "w", encoding="utf-8") as f:
             for trace in useless_fail_trace:
                 json.dump(trace, f, ensure_ascii=False)
                 f.write("\n")
         print(f"{GREEN}[DEBUG] Useless fail traces saved to {useless_fail_trace_file}{RESET}")
-                    
+
+        return new_result
+                        
 
     
     @staticmethod
@@ -1013,8 +1025,8 @@ async def main(objective: str = None, eval_mode: bool = False, task_id: str = No
     print(f"{CYAN}[DEBUG] Printing MCTS result{RESET}")
 
     BrowserMCTSWrapper.print_max_result(result,task_id,success_path)
-    BrowserMCTSWrapper.filter_fail_result(result,filter)
-    BrowserMCTSWrapper.print_fail_result(result,task_id,fail_path)
+    result_f=await BrowserMCTSWrapper.filter_fail_result(result,filter)
+    BrowserMCTSWrapper.print_fail_result(result_f,task_id,fail_path)
             
 
     # # Tree visualization
