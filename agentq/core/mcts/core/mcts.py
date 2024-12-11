@@ -276,7 +276,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             ):
                 return path
             node = self._uct_select(node)
-            await self.world_model.step(node.parent.state, node.action)
+           
 
     # def _uct(self, node: MCTSNode) -> float:
     #     return node.Q + self.w_exp * np.sqrt(
@@ -336,7 +336,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 node_tmp = node.parent
             actions = await self.search_config.get_actions(node_tmp.state)
             new_node = MCTSNode(
-                state=None,
+                state=node_tmp.state,
                 action=node_tmp.action,
                 parent=node_tmp.parent,
                 fast_reward=node_tmp.fast_reward,
@@ -388,6 +388,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                     path.append(node)
                 print(f"result_child:{result_child}")
                 print(f"flag:{flag}")  
+            print(f"node.depth:{node.depth}")
+            print(f"self._is_terminal_with_depth_limit(node){self._is_terminal_with_depth_limit(node)}")
             if self._is_terminal_with_depth_limit(node) or not result_child:
                 return
             fast_rewards = [child.fast_reward for child in node.children]

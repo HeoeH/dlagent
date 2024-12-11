@@ -1059,8 +1059,9 @@ if __name__ == "__main__":
     log_file = args.log_file
     fail_path = args.fail_path
     success_path = args.success_path
-    n_iteration=args.n_iteration
-    depth_limit=args.depth_limit
+    n_iteration = args.n_iteration
+    depth_limit = args.depth_limit
+    print(f"{BLUE}depth_limit:{depth_limit}{RESET}")
 
     print(f"{BLUE}[DEBUG] Script started{RESET}")
     completed_tasks = []
@@ -1069,6 +1070,8 @@ if __name__ == "__main__":
         # 遍历指定目录下的所有 .jsonl 文件
         jsonl_files = [f for f in os.listdir(directory) if f.endswith('.jsonl')]
         print(f"{CYAN}[DEBUG] Found JSONL files: {jsonl_files}{RESET}")
+
+        loop = asyncio.get_event_loop()
 
         for jsonl_file in jsonl_files:
             jsonl_file_path = os.path.join(directory, jsonl_file)
@@ -1085,7 +1088,7 @@ if __name__ == "__main__":
                 print(f"{CYAN}[DEBUG] Objective set: {objective}{RESET}")
                 print(f"{CYAN}[DEBUG] task_id: {task_id}{RESET}")
 
-                asyncio.run(
+                loop.run_until_complete(
                     main(
                         objective=objective,
                         eval_mode=False,
