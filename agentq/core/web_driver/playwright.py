@@ -215,6 +215,7 @@ class PlaywrightManager:
                         '--remote-debugging-port=9222', # 启用远程调试端口
                         '--in-process-plugins', #插件在浏览器进程中运行
                         '--allow-outdated-plugins', # 允许使用过渡插件
+                        "--restore-last-session",
                     ],
                     no_viewport=True,
                 )

@@ -5,6 +5,7 @@ from typing import List, Tuple
 import re
 import numpy as np
 import argparse
+from urllib.parse import urlparse
 import os
 import json
 import asyncio
@@ -96,12 +97,13 @@ SPECIAL_KEY_MAPPINGS = {
 
 @traceable(run_type="chain", name="mcts")
 class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
-    def __init__(self, objective: str, vision: BaseAgent, critic: BaseAgent,task_id:str) -> None:
+    def __init__(self, objective: str, vision: BaseAgent, critic: BaseAgent,task_id:str,directory:str) -> None:
         super().__init__()
         self.objective = objective
         self.vision = vision
         self.critic = critic
         self.task_id = task_id
+        self.directory = directory
         print(
             f"{BLUE}[DEBUG] BrowserWorldModel initialized with objective: {self.objective}{RESET}"
         )
@@ -143,7 +145,7 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         
         try:
             new_dom, new_url, new_base64_img,new_img_path = await self.execute_browser_action(
-            browser_action
+            browser_action,state.objective
             )
             current_task = browser_action.task_with_action
             new_completed_tasks = state.completed_tasks + [current_task]
@@ -169,11 +171,31 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         return terminal
 
     async def execute_browser_action(
-        self, browser_action: BrowserAction
+        self, browser_action: BrowserAction,objective:str
     ) -> Tuple[str, str, str]:
         browser_manager = PlaywrightManager(browser_type="chromium", headless=False)
-        await browser_manager.get_browser_context()
+        context=await browser_manager.get_browser_context()
         page = await browser_manager.get_current_page()
+        parsed_url = urlparse(objective.split()[-1])
+        domain = parsed_url.netloc
+        
+        # 组合文件路径
+        json_file_path = os.path.join(self.directory, f"{domain}.json")
+        print(f"json_file_path:{json_file_path}")
+        with open(json_file_path, 'r') as f:
+            cookies = json.load(f)
+            if not isinstance(cookies, list):
+                raise ValueError("Cookies should be a list of cookie objects")
+            print(cookies[0])
+            # 确保 sameSite 属性的值是正确的
+            for cookie in cookies:
+                if 'sameSite' not in cookie or cookie['sameSite'].lower() not in ['strict', 'lax', 'none']:
+                    cookie['sameSite'] = 'Lax'  # 设置默认值为 'Lax'
+                else:
+                    cookie['sameSite'] = cookie['sameSite'].capitalize()
+            
+           
+            await context.add_cookies(cookies)
 
         async def retry_action(action_func, retries=3, delay=1):
             for attempt in range(retries):
@@ -582,11 +604,12 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
         vision: BaseAgent,
         filter: BaseAgent,
         task_id: str,
+        directory: str,
         n_iterations: int = 1,
         depth_limit: int = 1,
         exploration_weight: float = 1.0,
     ):
-        world_model = BrowserWorldModel(objective, vision, critic,task_id)
+        world_model = BrowserWorldModel(objective, vision, critic,task_id,directory)
         search_config = BrowserMCTSSearchConfig(actor, critic, vision,task_id)
         search_algo = MCTS(
             n_iters=n_iterations,
@@ -1026,7 +1049,7 @@ async def wait_for_navigation(max_retries=3):
     print(f"{RED}[DEBUG] Navigation failed after {max_retries} attempts{RESET}")
 
 
-async def main(objective: str = None, eval_mode: bool = False, task_id: str = None,fail_path:str=None,success_path:str=None,n_iteration:int=None,depth_limit:int=None):
+async def main(objective: str = None, eval_mode: bool = False, task_id: str = None,fail_path:str=None,success_path:str=None,n_iteration:int=None,depth_limit:int=None,directory:str=None):
     print(f"{BLUE}Starting MCTS{RESET}")
     playwright_manager = PlaywrightManager()
 
@@ -1058,6 +1081,7 @@ async def main(objective: str = None, eval_mode: bool = False, task_id: str = No
         depth_limit=depth_limit,
         exploration_weight=1.0,
         task_id=task_id,
+        directory=directory,
     )
 
     print(f"{YELLOW}[DEBUG] Running MCTS wrapper{RESET}")
@@ -1152,7 +1176,8 @@ if __name__ == "__main__":
                         fail_path=fail_path,
                         success_path=success_path,
                         n_iteration=n_iteration,
-                        depth_limit=depth_limit
+                        depth_limit=depth_limit,
+                        directory=directory,
                     )
                 )
                 completed_tasks.append(task_id)

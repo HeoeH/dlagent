@@ -50,7 +50,7 @@ async def get_screenshot(
         # Save the screenshot to a file
         timestamp = get_formatted_timestamp()
         # 确定 result 文件夹的路径
-        base_folder = Path("result").resolve()
+        base_folder = Path("result/IL_1").resolve()
         base_folder.mkdir(parents=True, exist_ok=True)  # 确保 result 文件夹存在
         file_path=""
         # 如果未提供子文件夹名称，使用默认名称
