@@ -49,7 +49,7 @@ class BaseAgent:
         if client == "openai":
             self.client = openai.Client(
                 base_url="https://xiaoai.plus/v1",
-                api_key="sk-ZJSZINGTXVrk4dCvKHeNi9PGLLlKjxjLZ7vgeUaaF1yHJWio",
+                api_key="sk-wott59yXSvxM7GL35Nq9ImXRnTfwYCU1U7QKyK4jh95724dB",
             )
         elif client == "together":
             self.client = openai.OpenAI(

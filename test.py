@@ -4,7 +4,7 @@ import json
 def run(playwright: Playwright) -> None:
     browser = playwright.chromium.launch(executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe', headless=False)
     context = browser.new_context()
-    storage_state = "data_webvoyager_training/IL_1/www.marriott.com.json"
+    storage_state = "data_webvoyager_training/IL_1/www.ryanair.com.json"
     
     # 读取并添加 cookies
     with open(storage_state, 'r') as f:
@@ -22,7 +22,7 @@ def run(playwright: Playwright) -> None:
         context.add_cookies(cookies)
     
     page = context.new_page()
-    page.goto('https://www.marriott.com')
+    page.goto('https://www.ryanair.com')
     # # 检查 cookies 是否正确应用
     context_cookies = context.cookies()
     print("Current cookies in context:")

@@ -182,21 +182,28 @@ class BrowserWorldModel(WorldModel[BrowserState, BrowserAction, str]):
         # 组合文件路径
         json_file_path = os.path.join(self.directory, f"{domain}.json")
         print(f"json_file_path:{json_file_path}")
-        with open(json_file_path, 'r') as f:
-            cookies = json.load(f)
-            if not isinstance(cookies, list):
-                raise ValueError("Cookies should be a list of cookie objects")
-            print(cookies[0])
-            # 确保 sameSite 属性的值是正确的
-            for cookie in cookies:
-                if 'sameSite' not in cookie or cookie['sameSite'].lower() not in ['strict', 'lax', 'none']:
-                    cookie['sameSite'] = 'Lax'  # 设置默认值为 'Lax'
-                else:
-                    cookie['sameSite'] = cookie['sameSite'].capitalize()
-            
-           
-            await context.add_cookies(cookies)
-
+            # 检查cookies文件是否存在
+        if os.path.exists(json_file_path):
+            try:
+                with open(json_file_path, 'r') as f:
+                    cookies = json.load(f)
+                    if not isinstance(cookies, list):
+                        raise ValueError("Cookies should be a list of cookie objects")
+                    print(cookies[0])
+                    # 确保 sameSite 属性的值是正确的
+                    for cookie in cookies:
+                        if 'sameSite' not in cookie or cookie['sameSite'].lower() not in ['strict', 'lax', 'none']:
+                            cookie['sameSite'] = 'Lax'  # 设置默认值为 'Lax'
+                        else:
+                            cookie['sameSite'] = cookie['sameSite'].capitalize()
+                    
+                    await context.add_cookies(cookies)
+                    print(f"Successfully loaded cookies for {domain}")
+            except Exception as e:
+                print(f"Error loading cookies for {domain}: {e}")
+        else:
+            print(f"No cookies file found for {domain}, continuing without cookies")
+        
         async def retry_action(action_func, retries=3, delay=1):
             for attempt in range(retries):
                 try:
