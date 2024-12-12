@@ -288,7 +288,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                     flag,result_child=await self.world_model.step(node.parent.state, node.action)
                 except  Exception as e:
                     if not flag or not result_child:
-                        self._select(self.root)
+                        await self._select(self.root)
                         
 
            
@@ -429,7 +429,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         if flag:
             actions = await self.search_config.get_actions(node.state)
         else:
-            node.parent.children.remove(node)
+            if node in node.parent.children:
+                node.parent.children.remove(node)
             return flag,False
         print("Got possible actions")
         if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
