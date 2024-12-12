@@ -281,18 +281,15 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 return path
             node = self._uct_select(node)
             try:
-                await self.world_model.step(node.parent.state, node.action)
+                flag,result_child=await self.world_model.step(node.parent.state, node.action)
             except Exception as e:
                 print(f"Exception during world_model.step:{e},retry..")
                 try:
-                    await self.world_model.step(node.parent.state, node.action)
+                    flag,result_child=await self.world_model.step(node.parent.state, node.action)
                 except  Exception as e:
-                    if not node.children:
-                        node.parent.children.remove(node)
-                        node=self._uct_select(node.parent)
-                    else:
-                        node.N=10
-                        node=self._uct_select(node.parent)
+                    if not flag or not result_child:
+                        self._select(self.root)
+                        
 
            
 
@@ -319,6 +316,89 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
 
         # If all nodes have been visited, use the UCB1 formula
         return max(node.children, key=self._uct)
+
+    # async def _expand(self, node: MCTSNode) -> bool:
+    #     print("Expanding node")
+    #     flag = True
+    #     if node.state is None:
+    #         try:
+    #             node.state, aux = await self.world_model.step(
+    #                 node.parent.state, node.action
+    #             )
+    #             print(f"Node state_IMG:{node.state.img_path}")
+
+    #         # reward is calculated after the state is updated, so that the
+    #         # information can be cached and passed from the world model
+    #         # to the reward function with **aux without repetitive computation
+    #             node.reward, node.fast_reward_details, node.is_terminal = await self.search_config.reward(
+    #                 node.state, node.action, **node.fast_reward_details
+    #             )
+    #         # node.is_terminal = await self.world_model.is_terminal(node.state)
+    #         except Exception as e:
+    #             print(f"Exception during world_model.step: {e}")
+    #             flag = False
+    #     if node.is_terminal:
+    #         return flag, False
+
+    #     children = []
+    #     # print(node.state.url)
+    #     # print(node)
+    #     if flag:
+    #         actions = await self.search_config.get_actions(node.state)
+    #     else:
+    #         node_tmp=node
+    #         while node_tmp.state is None:
+    #             node_tmp = node.parent
+    #         actions = await self.search_config.get_actions(node_tmp.state)
+    #         new_node = MCTSNode(
+    #             state=node_tmp.state,
+    #             action=node_tmp.action,
+    #             parent=node_tmp.parent,
+    #             fast_reward=node_tmp.fast_reward,
+    #             fast_reward_details=node_tmp.fast_reward_details,
+    #             is_terminal=node_tmp.is_terminal,
+    #             calc_q=node_tmp.calc_q,
+    #         )
+    #         node.state = new_node.state
+    #         node.action = new_node.action
+    #         node.parent = new_node.parent
+    #         node.fast_reward = new_node.fast_reward
+    #         node.fast_reward_details = new_node.fast_reward_details
+    #         node.is_terminal = new_node.is_terminal
+    #         node.calc_q = new_node.calc_q
+    #     print("Got possible actions")
+    #     if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
+    #         node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
+    #             node.state, node.action, **node.fast_reward_details
+    #         )
+    #         child = MCTSNode(
+    #             state=None,
+    #             action=actions[0],
+    #             parent=node,
+    #             fast_reward=node.reward,
+    #             fast_reward_details={},
+    #             calc_q=self.calc_q,
+    #         )
+    #         node.children = children
+
+    #         return flag, False
+
+    #     for action in actions:
+    #         fast_reward, fast_reward_details = self.search_config.fast_reward(
+    #             node.state, action
+    #         )
+    #         child = MCTSNode(
+    #             state=None,
+    #             action=action,
+    #             parent=node,
+    #             fast_reward=fast_reward,
+    #             fast_reward_details=fast_reward_details,
+    #             calc_q=self.calc_q,
+    #         )
+    #         children.append(child)
+
+    #     node.children = children
+    #     return flag, True
 
     async def _expand(self, node: MCTSNode) -> bool:
         print("Expanding node")
@@ -349,26 +429,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         if flag:
             actions = await self.search_config.get_actions(node.state)
         else:
-            node_tmp=node
-            while node_tmp.state is None:
-                node_tmp = node.parent
-            actions = await self.search_config.get_actions(node_tmp.state)
-            new_node = MCTSNode(
-                state=node_tmp.state,
-                action=node_tmp.action,
-                parent=node_tmp.parent,
-                fast_reward=node_tmp.fast_reward,
-                fast_reward_details=node_tmp.fast_reward_details,
-                is_terminal=node_tmp.is_terminal,
-                calc_q=node_tmp.calc_q,
-            )
-            node.state = new_node.state
-            node.action = new_node.action
-            node.parent = new_node.parent
-            node.fast_reward = new_node.fast_reward
-            node.fast_reward_details = new_node.fast_reward_details
-            node.is_terminal = new_node.is_terminal
-            node.calc_q = new_node.calc_q
+            node.parent.children.remove(node)
+            return flag,False
         print("Got possible actions")
         if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
             node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
@@ -383,6 +445,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 calc_q=self.calc_q,
             )
             node.children = children
+
             return flag, False
 
         for action in actions:
