@@ -290,15 +290,14 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             node = self._uct_select(node)
             flag=True
             try:
-                flag,result_child=await self.world_model.step(node.parent.state, node.action)
+                await self.world_model.step(node.parent.state, node.action)
             except Exception as e:
                 print(f"Exception during world_model.step:{e},retry..")
                 try:
-                    flag,result_child=await self.world_model.step(node.parent.state, node.action)
+                    await self.world_model.step(node.parent.state, node.action)
                 except  Exception as e:
-                    if not flag or not result_child:
-                        node.N=1000
-                        await self._select(self.root)
+                    node.N=1000
+                    await self._select(self.root)
                         
 
            
