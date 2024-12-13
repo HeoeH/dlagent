@@ -337,6 +337,8 @@ You are part of an overall larger system where the actions you output are comple
 5. [VERY IMPORTANT]: If you are very confident that all the necessary information is already present in the current screenshot and webpage information,Please return only the task with action type "STOP", do not return action "NONE" ,chose the action "STOP",do not return three tasks, and set is_complete to True.
 6. [VERY IMPORTANT]: If web_text contains multiple similar elements and you need to determine which MMID to click for a search, you can observe the screenshot (current_base64_img) to identify the correct element. The number in the upper left corner of each element's bounding box on the screenshot plus 1 is the element's MMID. Use visual information to distinguish these similar elements and return the correct MMID.
 7. [VERY IMPORTANT]:If a prompt to accept cookies appears on the page (usually at the bottom of the page), please propose only one task: accept all cookies, and perform the necessary click or other actions to accept the cookies based on the situation.Note: only return this single task in this case and case that mention above; in all other cases return three tasks.
+8. Never return None for proposed_tasks under any circumstances.
+
 
 Your input and output will strictly be a well-formatted JSON with attributes as mentioned below.
 Input:
