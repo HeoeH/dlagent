@@ -725,6 +725,9 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 conversations = [{"from": "system", "value": system_prompt}]
                 images = []
                 for i, (state, action) in enumerate(zip(states, actions)):
+                    if state is None or action is None or not hasattr(action, 'task_with_action'):
+                        print(f"Warning: state, action or action.task_with_action is None or missing at index {i}")
+                        continue
                     input_data = AgentQActorInput(
                         objective=state.objective,
                         completed_tasks=state.completed_tasks,
@@ -799,17 +802,28 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
     #         json.dump(output, file, indent=4)
 
 
-    @staticmethod
-    async def filter_fail_result(result: MCTSResult, filter: BaseAgent) -> Tuple[MCTSResult,MCTSResult]:
+    async def filter_fail_result(result: MCTSResult, filter: BaseAgent) -> Tuple[MCTSResult, MCTSResult]:
         if result.fail_trace is None or len(result.fail_trace) == 0:
             print(f"{RED}[DEBUG] No valid path found{RESET}")
-            return result,result
+            return result, result
+
         filtered_fail_trace = []
         useless_fail_trace = []
+
         for j, trace in enumerate(result.fail_trace):
             states, actions = trace
             if states:
                 last_state = states[-1]
+                # 如果 last_state 为空，则递归查找其父节点
+                while last_state is None and len(states) > 1:
+                    states.pop()
+                    last_state = states[-1]
+
+                if last_state is None:
+                    print(f"{RED}[DEBUG] No valid state found in trace {j}{RESET}")
+                    useless_fail_trace.append(trace)
+                    continue
+
                 fail_input: FailFilterInput = FailFilterInput(
                     objective=last_state.done_objective,
                     completed_tasks=last_state.completed_tasks,
@@ -847,9 +861,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             # 其他属性保持不变
         )
 
-
-        return new_result,useless_result
-                        
+        return new_result, useless_result
 
     
     @staticmethod
@@ -870,8 +882,22 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 states, actions = trace
                 conversations = [{"from": "system", "value": system_prompt}]
                 images = []
-                modify_objective=states[-1].done_objective
+                
+                # 如果 states[-1] 为空，则递归查找其父节点
+                last_state = states[-1]
+                while last_state is None and len(states) > 1:
+                    states.pop()
+                    last_state = states[-1]
+
+                if last_state is None:
+                    print(f"{RED}[DEBUG] No valid state found in trace {j}{RESET}")
+                    continue
+
+                modify_objective = last_state.done_objective
                 for i, (state, action) in enumerate(zip(states, actions)):
+                    if state is None or action is None or not hasattr(action, 'task_with_action'):
+                        print(f"Warning: state, action or action.task_with_action is None or missing at index {i}")
+                        continue
                     input_data = AgentQActorInput(
                         objective=modify_objective,
                         completed_tasks=state.completed_tasks,
@@ -891,7 +917,6 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 output.append(trace_output)
 
             json.dump(output, file, indent=4)
-
     @staticmethod
     def print_useless_result(result: MCTSResult, task_id: str, file_path: str = None):
         if file_path is None:
@@ -910,8 +935,22 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 states, actions = trace
                 conversations = [{"from": "system", "value": system_prompt}]
                 images = []
-                modify_objective=states[-1].done_objective
+                
+                # 如果 states[-1] 为空，则递归查找其父节点
+                last_state = states[-1]
+                while last_state is None and len(states) > 1:
+                    states.pop()
+                    last_state = states[-1]
+
+                if last_state is None:
+                    print(f"{RED}[DEBUG] No valid state found in trace {j}{RESET}")
+                    continue
+
+                modify_objective = last_state.done_objective
                 for i, (state, action) in enumerate(zip(states, actions)):
+                    if state is None or action is None or not hasattr(action, 'task_with_action'):
+                        print(f"Warning: state, action or action.task_with_action is None or missing at index {i}")
+                        continue
                     input_data = AgentQActorInput(
                         objective=modify_objective,
                         completed_tasks=state.completed_tasks,
@@ -931,7 +970,6 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 output.append(trace_output)
 
             json.dump(output, file, indent=4)
-
     # @staticmethod
     # def print_fail_result(result: MCTSResult, task_id: str, file_path: str = None):
     #     if file_path is None:
