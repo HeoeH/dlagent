@@ -623,6 +623,7 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
             w_exp=exploration_weight,
             cum_reward=sum,
             calc_q=np.mean,
+            task_id=task_id,
             simulate_strategy="max",
             output_strategy="max_reward",
             depth_limit=depth_limit,
@@ -723,10 +724,9 @@ class BrowserMCTSWrapper(Reasoner[BrowserState, BrowserAction, str]):
                 states, actions = trace
                 conversations = [{"from": "system", "value": system_prompt}]
                 images = []
-                modify_objective=states[-1].done_objective
                 for i, (state, action) in enumerate(zip(states, actions)):
                     input_data = AgentQActorInput(
-                        objective=modify_objective,
+                        objective=state.objective,
                         completed_tasks=state.completed_tasks,
                         current_web_text=state.web_text,
                         current_base64_img="<image>",

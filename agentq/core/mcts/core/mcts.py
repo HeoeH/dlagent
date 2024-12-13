@@ -1,11 +1,17 @@
 import itertools
 import math
+import os
+import json
 from abc import ABC
 from collections import defaultdict
 from copy import deepcopy
 from typing import Callable, Generic, Hashable, NamedTuple, Optional
 from agentq.core.models.models import STOPAction 
+from agentq.core.prompts.prompts import LLM_PROMPTS
+from agentq.core.models.models import   AgentQActorInput
+from agentq.core.skills.process_data import process_data
 import numpy as np
+import copy
 from tqdm import trange
 # ANSI color codes
 BLUE = "\033[94m"
@@ -162,6 +168,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         w_exp: float = 1.0,
         depth_limit: int = 5,
         n_iters: int = 5,
+        task_id: str = None,
         cum_reward: Callable[[list[float]], float] = sum,
         calc_q: Callable[[list[float]], float] = np.mean,
         simulate_strategy: str | Callable[[list[float]], int] = "random",
@@ -196,6 +203,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         self.search_config = None
         self.output_trace_in_each_iter = output_trace_in_each_iter
         self.w_exp = w_exp
+        self.task_id = task_id
         self.depth_limit = depth_limit
         self.n_iters = n_iters
         self.cum_reward = cum_reward
@@ -289,6 +297,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                     flag,result_child=await self.world_model.step(node.parent.state, node.action)
                 except  Exception as e:
                     if not flag or not result_child:
+                        node.N=1000
                         await self._select(self.root)
                         
 
@@ -326,8 +335,6 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
                 node.state, aux = await self.world_model.step(
                     node.parent.state, node.action
                 )
-                print(f"Node state_IMG:{node.state.img_path}")
-
             # reward is calculated after the state is updated, so that the
             # information can be cached and passed from the world model
             # to the reward function with **aux without repetitive computation
@@ -347,26 +354,8 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
         if flag:
             actions = await self.search_config.get_actions(node.state)
         else:
-            node_tmp=node
-            while node_tmp.state is None:
-                node_tmp = node.parent
-            actions = await self.search_config.get_actions(node_tmp.state)
-            new_node = MCTSNode(
-                state=node_tmp.state,
-                action=node_tmp.action,
-                parent=node_tmp.parent,
-                fast_reward=node_tmp.fast_reward,
-                fast_reward_details=node_tmp.fast_reward_details,
-                is_terminal=node_tmp.is_terminal,
-                calc_q=node_tmp.calc_q,
-            )
-            node.state = new_node.state
-            node.action = new_node.action
-            node.parent = new_node.parent
-            node.fast_reward = new_node.fast_reward
-            node.fast_reward_details = new_node.fast_reward_details
-            node.is_terminal = new_node.is_terminal
-            node.calc_q = new_node.calc_q
+           node.fast_reward=-1
+           return flag,False
         print("Got possible actions")
         if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
             node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
@@ -484,8 +473,10 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             if node.state is None:
                 flag,result_child=await self._expand(node) 
                 if flag:
-                    print(f"node.node.action.task_with_action:{node.action.task_with_action}")
+                    print(f"node.action.task_with_action:{node.action.task_with_action}")
                     path.append(node)
+                else:
+                    self._simulate(path)
                 print(f"result_child:{result_child}")
                 print(f"flag:{flag}")  
             print(f"node.depth:{node.depth}")
@@ -493,8 +484,12 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             if self._is_terminal_with_depth_limit(node) or not result_child:
                 return
             fast_rewards = [child.fast_reward for child in node.children]
-            print("fast rewards")
-            print(fast_rewards)
+            count = 0
+            for fast_reward in fast_rewards:
+                if fast_reward < 0:
+                    count += 1
+                if count >= 3:
+                    return
             node = node.children[self.simulate_choice(fast_rewards)]
 
             
@@ -508,8 +503,68 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     #         node.cum_rewards.append(cum_reward)
     #     return cum_reward
 
+    def _print_success_result(self, path: list[MCTSNode], file_path: str = None):
+        task_id=self.task_id
+        if file_path is None:
+            file_path = f"result/IL_1/{task_id}/success_iter_output.json"
+        else:
+            file_path = os.path.join(file_path, f"{task_id}/success_iter_output.json")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # 读取现有内容或初始化
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                output = json.load(file)
+        else:
+            output = []
+
+        trace_success = (
+            [node.state for node in path],
+            [node.action for node in path],
+        )
+        system_prompt: str = LLM_PROMPTS["AGENTQ_FINETUNE_PROMPT"]
+        states, actions = trace_success
+        # 打印 states 和 actions 的长度
+        print(f"Length of states: {len(states)}")
+        print(f"Length of actions: {len(actions)}")
+        conversations = [{"from": "system", "value": system_prompt}]
+        images = []
+        for i, (state, action) in enumerate(zip(states, actions)):
+            if action is None or not hasattr(action, 'task_with_action'):
+                print(f"Warning: action or action.task_with_action is None or missing at index {i}")
+                continue
+            print(f"action.task_with_action:{action.task_with_action}")
+            input_data = AgentQActorInput(
+                objective=state.objective,
+                completed_tasks=state.completed_tasks,
+                current_web_text=state.web_text,
+                current_base64_img="<image>",
+            )
+            response = action.task_with_action
+            messages = process_data(input_data, response)
+            conversations.extend(messages)
+            images.append(state.img_path)
+
+        trace_output = {
+            "id": f"{task_id}_success_iter_{i}",
+            "conversations": conversations,
+            "images": images
+        }
+        output.append(trace_output)
+
+        # 写入文件
+        with open(file_path, "w") as file:
+            json.dump(output, file, indent=4)
     def _back_propagate(self, path: list[MCTSNode]):
         reward = path[-1].reward
+        if path[-1].is_terminal:
+            path_tmp = copy.deepcopy(path)
+            trace_success = (
+                [node.state for node in path_tmp],
+                [node.action for node in path_tmp],
+            )
+            self._print_success_result(path_tmp)
+            
         for node in reversed(path):
             if node.state is None:
                 continue
