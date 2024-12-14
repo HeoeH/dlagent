@@ -10,6 +10,7 @@ from agentq.core.models.models import STOPAction
 from agentq.core.prompts.prompts import LLM_PROMPTS
 from agentq.core.models.models import   AgentQActorInput
 from agentq.core.skills.process_data import process_data
+from agentq.core.models.models import BrowserAction, TaskWithActions
 import numpy as np
 import copy
 from tqdm import trange
@@ -288,14 +289,14 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             ):
                 return path
             node = self._uct_select(node)
-            flag=True
+    
             try:
                 await self.world_model.step(node.parent.state, node.action)
             except Exception as e:
                 print(f"Exception during world_model.step:{e},retry..")
                 try:
                     await self.world_model.step(node.parent.state, node.action)
-                except  Exception as e:
+                except  Exception as e:    
                     node.N=1000
                     await self._select(self.root)
                         
@@ -329,6 +330,14 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     async def _expand(self, node: MCTSNode) -> bool:
         print("Expanding node")
         flag = True
+        if node.action is not None and len(node.action.task_with_action.actions_to_be_performed) == 1:
+            if isinstance(node.action.task_with_action.actions_to_be_performed[0], STOPAction):
+                node.state=node.parent.state
+                node.state.completed_tasks.append(node.action.task_with_action)
+                node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
+                    node.state, node.action, **node.fast_reward_details
+                )
+                return flag, False
         if node.state is None:
             try:
                 node.state, aux = await self.world_model.step(
@@ -357,20 +366,22 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
            return flag,False
         print("Got possible actions")
         if len(actions) == 1 and len(actions[0].task_with_action.actions_to_be_performed) == 1 and isinstance(actions[0].task_with_action.actions_to_be_performed[0], STOPAction):
-            node.reward, node.reward_details, node.is_terminal = await self.search_config.reward(
-                node.state, node.action, **node.fast_reward_details
+            action=actions[0]
+            fast_reward, fast_reward_details = self.search_config.fast_reward(
+                node.state, action
             )
             child = MCTSNode(
                 state=None,
                 action=actions[0],
                 parent=node,
-                fast_reward=node.reward,
+                fast_reward=fast_reward,
                 fast_reward_details={},
                 calc_q=self.calc_q,
             )
+            children.append(child)
             node.children = children
 
-            return flag, False
+            return flag, True
 
         for action in actions:
             fast_reward, fast_reward_details = self.search_config.fast_reward(
@@ -470,26 +481,27 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
             flag = True
             result_child = True
             if node.state is None:
-                flag,result_child=await self._expand(node) 
+                flag, result_child = await self._expand(node)
                 if flag:
-                    print(f"node.action.task_with_action:{node.action.task_with_action}")
+                    print(f"node.node.action.task_with_action:{node.action.task_with_action}")
                     path.append(node)
-                else:
-                    self._simulate(path)
                 print(f"result_child:{result_child}")
-                print(f"flag:{flag}")  
+                print(f"flag:{flag}")
             print(f"node.depth:{node.depth}")
             print(f"self._is_terminal_with_depth_limit(node){self._is_terminal_with_depth_limit(node)}")
             if self._is_terminal_with_depth_limit(node) or not result_child:
                 return
             fast_rewards = [child.fast_reward for child in node.children]
-            count = 0
-            for fast_reward in fast_rewards:
-                if fast_reward < 0:
-                    count += 1
-                if count >= 3:
-                    return
-            node = node.children[self.simulate_choice(fast_rewards)]
+            print("fast rewards")
+            print(fast_rewards)
+            if not fast_rewards:  # 检查 fast_rewards 是否为空
+                print("No fast rewards available, selecting based on Q values")
+                node = max(node.children, key=lambda child: child.Q)
+            elif len(fast_rewards) == 1:  # 如果 fast_rewards 只有一个元素
+                print("Only one fast reward available, selecting the only child")
+                node = node.children[0]
+            else:
+                node = node.children[self.simulate_choice(fast_rewards)]
 
             
 
@@ -505,7 +517,7 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     def _print_success_result(self, path: list[MCTSNode], file_path: str = None):
         task_id=self.task_id
         if file_path is None:
-            file_path = f"result/IL_1/{task_id}/success_iter_output.json"
+            file_path = f"result_NEW/IL_1/{task_id}/success_iter_output.json"
         else:
             file_path = os.path.join(file_path, f"{task_id}/success_iter_output.json")
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -623,12 +635,28 @@ class MCTS(SearchAlgorithm, Generic[State, Action, Example]):
     async def search(self):
         self._output_cum_reward = -math.inf
         self._output_iter = None
+        
+        initial_task_with_action = TaskWithActions(
+        id=0,
+        description="No actions have been performed yet.",
+        actions_to_be_performed=[],
+        result=None
+        )
+
+        # 初始化一个 BrowserAction 对象
+        initial_action = BrowserAction(
+            task_with_action=initial_task_with_action,
+            rank=0.0
+        )
+
+        # 创建根节点
         self.root = MCTSNode(
             state=await self.world_model.init_state(),
-            action=None,
+            action=initial_action,  # 使用初始化的 action
             parent=None,
             calc_q=self.calc_q,
         )
+
         if self.output_trace_in_each_iter:
             self.trace_in_each_iter = []
 

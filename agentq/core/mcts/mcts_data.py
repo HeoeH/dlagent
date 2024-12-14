@@ -452,9 +452,8 @@ class BrowserMCTSSearchConfig(SearchConfig[BrowserState, BrowserAction, str]):
             )
         else :
             for task in proposed_tasks_with_actions:
-                state.completed_tasks.append(task)
-            ranked_actions = []
-            ranked_actions.append(BrowserAction(task_with_action=task, rank=1))
+                ranked_actions = []
+                ranked_actions.append(BrowserAction(task_with_action=task, rank=0.5))
         return ranked_actions
 
     async def reward(

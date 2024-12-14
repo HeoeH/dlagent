@@ -1,2 +1,2 @@
 set DIRECTORY=IL_1
-python -m agentq.core.mcts.mcts_data --directory data_webvoyager_training/%DIRECTORY% --log_file completed_tasks_optim_%DIRECTORY%.log --fail_path result/%DIRECTORY% --success_path result/%DIRECTORY% --n_iteration 5 --depth_limit 10
+python -m agentq.core.mcts.mcts_data --directory data_webvoyager_training/%DIRECTORY% --log_file completed_tasks_%DIRECTORY%.log --fail_path result_NEW/%DIRECTORY% --success_path result_NEW/%DIRECTORY% --n_iteration 5 --depth_limit 10
